@@ -79,6 +79,17 @@ function bytecode.generate(nodes)
     local readable = {data = readable_data, code = code_section}
     local compressed = compress(code_section, data_section)
 
+    --[[
+    print(".data")
+    for _, item in ipairs(readable.data) do
+        print(item)
+    end
+
+    print(".code")
+    for _, item in ipairs(readable.code) do
+        print(item)
+    end]]
+
     return {readable = readable, bc = compressed}
 end
 
