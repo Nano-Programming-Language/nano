@@ -1,5 +1,7 @@
-local bytecode = {
-    OPCODES = {
+local bytecode = 
+{
+    OPCODES = 
+    {
         PUSH = 0,
         POP = 1,
         LDV = 2,
@@ -18,8 +20,12 @@ local bytecode = {
         READLN = 15,
     }
 }
-
-local CHAR_MAP = { 
+--[[
+    No codegen, os opcodes são transformados em numeros e depois em um formato binário.
+    o CHAR_MAP vai servir pra converter o binário de volta pra um número decimal correspondente nos OPCODES.
+]]--
+local CHAR_MAP = 
+{ 
     ["\x01"] = 0,  
     ["\x02"] = 1,
     ["\x03"] = 2,
@@ -41,12 +47,12 @@ local CHAR_MAP = {
 local function decode(code)
     local decoded = {}
     if type(code) == "table" then -- Decodificar (decompress) a table de bytecode
-        for _, byte in ipairs(code) do
-            if type(byte) == "string" then
-                local opcode = CHAR_MAP[byte]
-                table.insert(decoded, opcode or byte)
+        for _, item in ipairs(code) do
+            if type(item) == "string" then
+                local opcode = CHAR_MAP[item]
+                table.insert(decoded, opcode or item)
             else
-                table.insert(decoded, byte)
+                table.insert(decoded, item)
             end
         end
     elseif type(code) == "string" then -- Mini lexer pra ler e decodificar o .nbc diretamente
@@ -116,8 +122,7 @@ function VM:get_val(index) -- checar se o valor index é um data[num] (e pegar o
     if type(index) == "string" then
         local num = tonumber(index:match("data%[(%d+)%]"))
         if num and num >= 1 and num <= #self.data then
-            local value = self.data[num]
-            return value
+            return self.data[num]
         end
     end
     return index
@@ -166,22 +171,25 @@ function VM:debug_print() -- debugs
     print("]")
 end
 
+--- Pega o próximo item no bytecode (um opcode ou qualquer outro valor), serve como um next_token
+function VM:next_val()
+   local v = self.code[self.pc]
+   self.pc = self.pc + 1
+   return v
+end
+
 function VM:run()
     local running = true 
     
     local handlers = 
     {
         [bytecode.OPCODES.SET] = function() -- Set um valor no .data
-            local raw = self.code[self.pc]
-            self.pc = self.pc + 1
-            local val = self:get_val(raw)
+            local val = self:next_val()
             table.insert(self.data, val)
         end,
 
-        [bytecode.OPCODES.PUSH] = function() -- Empurrar um valor na stack (nem precisava doc but ok)
-            local raw = self.code[self.pc]
-            self.pc = self.pc + 1
-            local val = self:get_val(raw)
+        [bytecode.OPCODES.PUSH] = function() -- Push um valor na stack (nem precisava doc but ok)
+            local val = self:get_val(self:next_val())
             table.insert(self.stack, val)
         end,
         
@@ -189,15 +197,13 @@ function VM:run()
             table.remove(self.stack)
         end,
         
-        [bytecode.OPCODES.LDV] = function() -- Carregar o valor de uma variável na stack
-            local varname = self.code[self.pc]
-            self.pc = self.pc + 1 
+        [bytecode.OPCODES.LDV] = function() -- Load o valor de uma variável na stack
+            local varname = self:next_val()
             table.insert(self.stack, self.vars[varname] or 0)
         end,
         
-        [bytecode.OPCODES.STV] = function() -- Guardar o último valor da stack em uma variável
-            local varname = self.code[self.pc]
-            self.pc = self.pc + 1
+        [bytecode.OPCODES.STV] = function() -- Store o último valor da stack em uma variável
+            local varname = self:next_val()
             self.vars[varname] = table.remove(self.stack)
         end,
         
@@ -280,14 +286,12 @@ function VM:run()
         end,
         
         [bytecode.OPCODES.CALL] = function()
-            local func_name = self.code[self.pc]
-            self.pc = self.pc + 1
+            local func_name = self:next_val()
             self:call_function(func_name)
         end,
         
         [bytecode.OPCODES.FUNC] = function()
-            local func_name = self.code[self.pc]
-            self.pc = self.pc + 1
+            local func_name = self:next_val()
             self.functions[func_name] = self.pc
             
             local nesting = 0
@@ -324,8 +328,7 @@ function VM:run()
     while running and self.pc <= #self.code do
         self:debug_print()
         
-        local opcode = self.code[self.pc]
-        self.pc = self.pc + 1
+        local opcode = self:next_val()
         
         local handler = handlers[opcode]
         if handler then

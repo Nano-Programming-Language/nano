@@ -30,7 +30,8 @@ local function define(kind, extra_methods)
     ast[kind] = class
 end
 
-define("Var", {
+define("Var", 
+{
     init = function(name, value) return { name = name, value = value } end,
     print = function(self, indent)
         indent = indent or 0
@@ -39,19 +40,23 @@ define("Var", {
     end
 })
 
-define("Number", {
+define("Number", 
+{
     init = function(value) return { value = value } end
 })
 
-define("String", {
+define("String", 
+{
     init = function(value) return { value = value } end
 })
 
-define("Identifier", {
+define("Identifier", 
+{
     init = function(name) return { name = name } end
 })
 
-define("Binary", {
+define("Binary", 
+{
     init = function(op, left, right) return { op = op, left = left, right = right } end,
     print = function(self, indent)
         indent = indent or 0
@@ -61,7 +66,8 @@ define("Binary", {
     end
 })
 
-define("Call", {
+define("Call", 
+{
     init = function(callee, args) return { callee = callee, args = args } end,
     print = function(self, indent)
         indent = indent or 0
@@ -72,7 +78,8 @@ define("Call", {
     end
 })
 
-define("Function", {
+define("Function", 
+{
     init = function(name, params, body) return { name = name, params = params, body = body } end,
     print = function(self, indent)
         indent = indent or 0
@@ -85,7 +92,8 @@ define("Function", {
     end
 })
 
-define("Return", {
+define("Return", 
+{
     init = function(value) return { value = value } end,
     print = function(self, indent)
         indent = indent or 0

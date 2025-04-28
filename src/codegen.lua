@@ -20,7 +20,8 @@ bytecode.OPCODES =
     RET = "RET",
 }
 
-local char_map = {
+local char_map = 
+{
     ["PUSH"] = "\x01",  
     ["POP"] = "\x02",
     ["LDV"] = "\x03",

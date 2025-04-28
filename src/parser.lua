@@ -4,7 +4,8 @@ local parser = {}
 parser.__index = parser
 
 function parser.new(tokens)
-    return setmetatable({
+    return setmetatable(
+    {
         tokens = tokens,
         index = 1,
         line = 1,
