@@ -1,4 +1,5 @@
-local error_types = {
+local error_types = 
+{ --ta bom ta bom vou deixar do jeito "bonitinho"
     --auto explicativo
     parser_error = "Parse error",
     lexer_error = "Lexer error",
@@ -19,9 +20,9 @@ for k, v in pairs(error_types) do -- gera as funções do erro automaticamente b
         ("%s: %s. Line %s, column %s, file %s."):format(
                 v,
                 msg,
-                line or "(?)",
-                column or "(?)",
-                filename or "(?)"
+                line or "?",
+                column or "?",
+                filename or "?"
             )
         )
     end
