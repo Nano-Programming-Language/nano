@@ -6,7 +6,6 @@ local error_types =
     codegen_error = "Codegen error",
     vm_error = "VM error",
     
-
     arithmetic_error = "Arithmetic error", -- divisão por 0, operandos incompatíveis etc
     constant_error = "Constant error", -- modificar constantes
     index_out_of_bounds = "Index out of bounds", -- acessar índices inválidos em arrays
@@ -27,6 +26,5 @@ for k, v in pairs(error_types) do -- gera as funções do erro automaticamente b
         )
     end
 end
-
 
 return errors
