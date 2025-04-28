@@ -216,18 +216,19 @@ function VM:run()
             table.insert(self.stack, input)
         end,
         
-        -- operações binárias (acho q ta ez de entender ent nem vou doc)
+        
         [bytecode.OPCODES.ADD] = function()
             local b = table.remove(self.stack)
             local a = table.remove(self.stack)
-            
-            local na = type(a) == "string" and tonumber(a) or a
-            local nb = type(b) == "string" and tonumber(b) or b
-            
-            if type(na) == "number" and type(nb) == "number" then
+
+            local na = tonumber(a)
+            local nb = tonumber(b)
+            if na and nb then
                 table.insert(self.stack, na + nb)
+            elseif type(a) == "string" and type(b) == "string" then
+                table.insert(self.stack, a .. b)
             else
-                table.insert(self.stack, tostring(a) .. tostring(b))
+                error("só é possible somar nums ou strings né otonto")
             end
         end,
         
@@ -235,46 +236,43 @@ function VM:run()
             local b = table.remove(self.stack)
             local a = table.remove(self.stack)
             
-            local na = type(a) == "string" and tonumber(a) or a
-            local nb = type(b) == "string" and tonumber(b) or b
-            
-            if type(na) ~= "number" or type(nb) ~= "number" then
+            local na = tonumber(a)
+            local nb = tonumber(b)
+            if na and nb then
+                table.insert(self.stack, na - na)
+            else
                 error("só é possible subtrair nums né otonto")
             end
-            
-            table.insert(self.stack, na - nb)
         end,
         
         [bytecode.OPCODES.MUL] = function()
             local b = table.remove(self.stack)
             local a = table.remove(self.stack)
             
-            local na = type(a) == "string" and tonumber(a) or a
-            local nb = type(b) == "string" and tonumber(b) or b
-            
-            if type(na) ~= "number" or type(nb) ~= "number" then
-                error("só é possible mutiplicar nums né otonto")
+            local na = tonumber(a)
+            local nb = tonumber(b)
+            if na and nb then
+                table.insert(self.stack, na * nb)
+            else
+                error("só é possible multplicar nums né otonto")
             end
-            
-            table.insert(self.stack, na * nb)
         end,
         
         [bytecode.OPCODES.DIV] = function()
             local b = table.remove(self.stack)
             local a = table.remove(self.stack)
             
-            local na = type(a) == "string" and tonumber(a) or a
-            local nb = type(b) == "string" and tonumber(b) or b
-            
-            if type(na) ~= "number" or type(nb) ~= "number" then
-                error("só é possible dividir nums né otonto")
+            local na = tonumber(a)
+            local nb = tonumber(b)
+            if na and nb then
+                if nb == 0 then
+                    error("divisão por zero nananan")
+                else
+                    table.insert(self.stack, na / nb)
+                end
+            else
+                error("só pode dividir números né otonto")
             end
-            
-            if nb == 0 then
-                error("divisao por 0 nananan")
-            end
-            
-            table.insert(self.stack, na / nb)
         end,
         
         [bytecode.OPCODES.HALT] = function()

@@ -101,7 +101,6 @@ local function run_repl()
     print("Goodbye!")
 end
 
-
 if #files > 0 then
     for _, file in ipairs(files) do
         run_file(file)
