@@ -1,5 +1,8 @@
 local ast = {}
 
+--- Define um novo node AST
+--- @param kind string Tipo do node (string, number, function, etc...)
+--- @param extra_methods table Funções desse node (padrão é init e print)
 local function define(kind, extra_methods)
     local class = {}
     class.__index = class

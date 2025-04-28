@@ -14,11 +14,12 @@ local bytecode = {
         CALL = 11,
         FUNC = 12,
         RET = 13,
-        SET = 14
+        SET = 14,
+        READLN = 15,
     }
 }
 
-local CHAR_MAP = {
+local CHAR_MAP = { 
     ["\x01"] = 0,  
     ["\x02"] = 1,
     ["\x03"] = 2,
@@ -34,11 +35,12 @@ local CHAR_MAP = {
     ["\x0D"] = 12,
     ["\x0E"] = 13,
     ["\x0F"] = 14,
+    ["\xA0"] = 15
 }
 
 local function decode(code)
     local decoded = {}
-    if type(code) == "table" then
+    if type(code) == "table" then -- Decodificar (decompress) a table de bytecode
         for _, byte in ipairs(code) do
             if type(byte) == "string" then
                 local opcode = CHAR_MAP[byte]
@@ -47,7 +49,7 @@ local function decode(code)
                 table.insert(decoded, byte)
             end
         end
-    elseif type(code) == "string" then
+    elseif type(code) == "string" then -- Mini lexer pra ler e decodificar o .nbc diretamente
         local i = 1
         local n = #code
         while i <= n do
@@ -110,7 +112,7 @@ function VM.new(code)
     return vm
 end
 
-function VM:get_val(index)
+function VM:get_val(index) -- checar se o valor index é um data[num] (e pegar o valor correspondente no .data)
     if type(index) == "string" then
         local num = tonumber(index:match("data%[(%d+)%]"))
         if num and num >= 1 and num <= #self.data then
@@ -130,7 +132,7 @@ function VM:call_function(func_name)
     self.pc = func_pc
 end
 
-function VM:debug_print()
+function VM:debug_print() -- debugs
     if not self.debug then return end
     
     print("\npc: " .. self.pc .. 
@@ -162,25 +164,21 @@ function VM:debug_print()
         if i < #self.data then io.write(", ") end
     end 
     print("]")
-
-    for i, item in ipairs(self.code) do
-        print(item)
-    end
 end
 
 function VM:run()
-    local running = true
+    local running = true 
     
     local handlers = 
     {
-        [bytecode.OPCODES.SET] = function()
+        [bytecode.OPCODES.SET] = function() -- Set um valor no .data
             local raw = self.code[self.pc]
             self.pc = self.pc + 1
             local val = self:get_val(raw)
             table.insert(self.data, val)
         end,
 
-        [bytecode.OPCODES.PUSH] = function()
+        [bytecode.OPCODES.PUSH] = function() -- Empurrar um valor na stack (nem precisava doc but ok)
             local raw = self.code[self.pc]
             self.pc = self.pc + 1
             local val = self:get_val(raw)
@@ -191,28 +189,34 @@ function VM:run()
             table.remove(self.stack)
         end,
         
-        [bytecode.OPCODES.LDV] = function()
+        [bytecode.OPCODES.LDV] = function() -- Carregar o valor de uma variável na stack
             local varname = self.code[self.pc]
             self.pc = self.pc + 1 
             table.insert(self.stack, self.vars[varname] or 0)
         end,
         
-        [bytecode.OPCODES.STV] = function()
+        [bytecode.OPCODES.STV] = function() -- Guardar o último valor da stack em uma variável
             local varname = self.code[self.pc]
             self.pc = self.pc + 1
             self.vars[varname] = table.remove(self.stack)
         end,
         
-        [bytecode.OPCODES.PRINT] = function()
+        [bytecode.OPCODES.PRINT] = function() -- Printar o último valor da stack (sem newline)
             local value = table.remove(self.stack)
             io.write(tostring(value))
         end,
         
-        [bytecode.OPCODES.PRINTLN] = function()
+        [bytecode.OPCODES.PRINTLN] = function() -- Printar o último valor da stack 
             local value = table.remove(self.stack)
             print(tostring(value))
         end,
+
+        [bytecode.OPCODES.READLN] = function() -- Ler o input e guardar na stack
+            local input = io.read("*l")
+            table.insert(self.stack, input)
+        end,
         
+        -- operações binárias (acho q ta ez de entender ent nem vou doc)
         [bytecode.OPCODES.ADD] = function()
             local b = table.remove(self.stack)
             local a = table.remove(self.stack)

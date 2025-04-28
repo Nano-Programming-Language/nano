@@ -1,0 +1,5 @@
+print("Type your name here: ")
+var name = readln()
+print("Type your age here: ")
+var age = readln()
+println("Your name is " + name + " and you're " + age + " years old.")

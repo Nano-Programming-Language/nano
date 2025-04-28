@@ -42,11 +42,11 @@ local function run_source(source)
             end
             file:close()
         end
-    else
-        local _vm = vm.new(bytecode.bc)
-        _vm:set_debug(false)
-        _vm:run()
     end
+
+    local _vm = vm.new(bytecode.bc)
+    _vm:set_debug(false)
+    _vm:run()
 end
 
 local function run_file(filepath)

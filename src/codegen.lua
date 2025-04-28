@@ -9,6 +9,7 @@ bytecode.OPCODES =
     STV = "STV",
     PRINT = "PRINT",
     PRINTLN = "PRINTLN",
+    READLN = "READLN",
     ADD = "ADD",
     SUB = "SUB",
     MUL = "MUL",
@@ -34,13 +35,14 @@ local char_map = {
     ["CALL"] = "\x0C",
     ["FUNC"] = "\x0D",
     ["RET"] = "\x0E",
+    ["READLN"] = "\xA0"
 }
 
 local function compress(code_section, data_section)
     local code_table = {}
 
     for _, item in ipairs(data_section) do
-        table.insert(code_table, "\x0F")
+        table.insert(code_table, "\x0F") -- SET antes de cada item do .data (pra ficar mais facil pra VM)
         table.insert(code_table, item)
     end
 
@@ -73,7 +75,7 @@ function bytecode.generate(nodes)
 
     local readable_data = {}
     for _, item in ipairs(data_section) do
-        table.insert(readable_data, "SET")
+        table.insert(readable_data, "SET") -- SET antes de cada item do .data (readable)
         table.insert(readable_data, item)
     end
     local readable = {data = readable_data, code = code_section}
@@ -137,6 +139,8 @@ function ast.Call:generate_bytecode(code_section, data_section)
     elseif self.callee == "print" then 
         self.args[1]:generate_bytecode(code_section, data_section)
         table.insert(code_section, bytecode.OPCODES.PRINT)
+    elseif self.callee == "readln" then
+        table.insert(code_section, bytecode.OPCODES.READLN)
     else
         for _, arg in ipairs(self.args) do
             arg:generate_bytecode(code_section, data_section)
