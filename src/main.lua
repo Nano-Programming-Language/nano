@@ -59,7 +59,7 @@ local function run_file(filepath)
     local content = file:read("*a")
     file:close()
 
-    if filepath:sub(-3) == ".bc" then
+    if filepath:sub(-4) == ".nbc" then
         local _vm = vm.new(content)
         _vm:set_debug(false)
         _vm:run()
