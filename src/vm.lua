@@ -245,7 +245,7 @@ function VM:run()
             local na = tonumber(a)
             local nb = tonumber(b)
             if na and nb then
-                table.insert(self.stack, na - na)
+                table.insert(self.stack, na - nb)
             else
                 error("só é possible subtrair nums né otonto")
             end
