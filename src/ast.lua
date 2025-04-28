@@ -39,7 +39,6 @@ define("Var", {
     end
 })
 
-
 define("Number", {
     init = function(value) return { value = value } end
 })
