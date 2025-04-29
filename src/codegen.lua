@@ -102,7 +102,7 @@ function ast.Number:generate_bytecode(code_section, data_section)
 end
 
 function ast.String:generate_bytecode(code_section, data_section)
-    table.insert(data_section, self.value)
+    table.insert(data_section, "\"" .. self.value .. "\"") 
     table.insert(code_section, bytecode.OPCODES.PUSH)
     table.insert(code_section, "data[" .. #data_section .. "]")
 end

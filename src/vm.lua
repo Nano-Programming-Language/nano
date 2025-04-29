@@ -47,10 +47,25 @@ local CHAR_MAP =
 local function decode(code)
     local decoded = {}
     if type(code) == "table" then -- Decodificar (decompress) a table de bytecode
+        local last_opcode = nil
         for _, item in ipairs(code) do
             if type(item) == "string" then
                 local opcode = CHAR_MAP[item]
-                table.insert(decoded, opcode or item)
+                if opcode then
+                    table.insert(decoded, opcode)
+                    last_opcode = opcode
+                else
+                    local is_quoted = item:match('^".*"$') or item:match("^'.*'$")
+                    local is_number = item:match("^%-?%d+$") or item:match("^%-?%d+%.%d+$")
+    
+                    if is_quoted then
+                        table.insert(decoded, item:sub(2, -2))
+                    elseif is_number then
+                        table.insert(decoded, tonumber(item))
+                    else
+                        table.insert(decoded, item)
+                    end
+                end
             else
                 table.insert(decoded, item)
             end
@@ -65,34 +80,44 @@ local function decode(code)
             if opcode then
                 local instruction = {opcode}
                 i = i + 1
-    
+            
                 while i <= n do
                     local next_byte = code:sub(i, i)
                     local next_opcode = CHAR_MAP[next_byte]
-
+            
                     if next_opcode then
                         break
                     end
+            
                     local next_item = next_byte
-    
+            
                     while i + 1 <= n do
-                        local next_byte = code:sub(i + 1, i + 1)
-                        local next_opcode = CHAR_MAP[next_byte]
-    
-                        if next_opcode then
+                        local lookahead = code:sub(i + 1, i + 1)
+                        local lookahead_opcode = CHAR_MAP[lookahead]
+            
+                        if lookahead_opcode then
                             break
                         end
-    
-                        next_item = next_item .. next_byte
+            
+                        next_item = next_item .. lookahead
                         i = i + 1
                     end
-    
+            
+                    local is_quoted = next_item:match('^".*"$') or next_item:match("^'.*'$")
+                    local is_number = next_item:match("^%-?%d+$") or next_item:match("^%-?%d+%.%d+$")
+                    if is_quoted then
+                        next_item = next_item:sub(2, -2) 
+                    elseif is_number then
+                        next_item = tonumber(next_item)
+                    end
+            
                     table.insert(instruction, next_item)
                     i = i + 1
                 end
-
-                table.insert(decoded, instruction[1])
-                table.insert(decoded, instruction[2])
+            
+                for _, v in ipairs(instruction) do
+                    table.insert(decoded, v)
+                end            
             else
                 table.insert(decoded, byte)
                 i = i + 1
@@ -137,38 +162,77 @@ function VM:call_function(func_name)
     self.pc = func_pc
 end
 
-function VM:debug_print() -- debugs
+function VM:debug_print()
     if not self.debug then return end
-    
-    print("\npc: " .. self.pc .. 
-          ", current opcode: " .. tostring(self.code[self.pc]) .. 
-          ", nexto opcode: " .. tostring(self.code[self.pc + 1] or "none"))
-    
-    io.write("stack: [")
-    for i, item in ipairs(self.stack) do
-        io.write(tostring(item))
-        if i < #self.stack then io.write(", ") end
-    end
-    print("]")
-    
-    io.write("vars: {")
-    local vars = {}
-    for k, v in pairs(self.vars) do
-        table.insert(vars, k)
-    end
-    
-    for i, k in ipairs(vars) do
-        io.write(tostring(k) .. "=" .. tostring(self.vars[k]))
-        if i < #vars then io.write(", ") end
-    end
-    print("}")
 
-    io.write("data: [")
-    for i, item in ipairs(self.data) do
-        io.write(tostring(item))
-        if i < #self.data then io.write(", ") end
-    end 
-    print("]")
+    local opcodes_str = {
+        [0] = "PUSH",
+        [1] = "POP",
+        [2] = "LDV",
+        [3] = "STV",
+        [4] = "PRINT",
+        [5] = "PRINTLN",
+        [6] = "ADD",
+        [7] = "SUB",
+        [8] = "MUL",
+        [9] = "DIV",
+        [10] = "HALT",
+        [11] = "CALL",
+        [12] = "FUNC",
+        [13] = "RET",
+        [14] = "READLN",
+    }    
+
+    local function format_table(t, open, close)
+        local str = open
+        for i, v in ipairs(t) do
+            if type(v) == "number" then
+                v = "\x1b[31;1m" .. v .. "\x1b[0m"
+            else 
+                v = "\x1b[32;1m\"" .. v .. "\"\x1b[0m"
+            end
+            str = str .. tostring(v)
+            if i < #t then
+                str = str .. ",\n\t "
+            end
+        end
+        return str .. close
+    end
+
+    local function format_vars(vars)
+        local parts = {}
+        for k, v in pairs(vars) do
+            if type(v) == "number" then
+                v = "\x1b[31;1m" .. v .. "\x1b[0m"
+            else 
+                v = "\x1b[32;1m\"" .. v .. "\"\x1b[0m"
+            end
+            table.insert(parts, "\x1b[33;1m" .. tostring(k) .. "\x1b[0m" .. " = " .. tostring(v) ..  "\x1b[0m")
+        end
+        table.sort(parts) 
+        return "{" .. table.concat(parts, ", ") .. "}"
+    end
+
+    print("\n--------------------------------------------")
+    local val1 = (opcodes_str[self.code[self.pc]] or (self.code[self.pc] or "None")) 
+    local val2 = (self.code[self.pc] or "None")
+    if (val1 == val2) then
+        print(string.format(" pc: %-2d │ current opcode: %s", self.pc, val1))
+    else 
+        print(string.format(" pc: %-2d │ current opcode: %s", self.pc, val1 .. " or " .. val2))
+    end
+
+    val1 = (opcodes_str[self.code[self.pc + 1]] or (self.code[self.pc + 1] or "None")) 
+    val2 = (self.code[self.pc + 1] or "None")
+    if (val1 == val2) then
+        print(" next: ", val1)
+    else 
+        print(" next: ", val1 .. " or " .. val2)
+    end
+    print(" Stack: " .. format_table(self.stack, "[", "]"))
+    print(" Vars:  " .. format_vars(self.vars))
+    print(" Data:  " .. format_table(self.data, "[", "]"))
+    print("--------------------------------------------")
 end
 
 --- Pega o próximo item no bytecode (um opcode ou qualquer outro valor), serve como um next_token
