@@ -188,6 +188,7 @@ function lexer:read_comments()
         return { type = "comment", value = comment }
 
     else
+        self:next_char() 
         return { type = "operator", value = "/" }
     end
 end
