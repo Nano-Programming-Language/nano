@@ -171,6 +171,14 @@ function parser:parse_binary()
     return left
 end
 
+function parser:parse_grouping()
+    self:expect("delimiter", "(")
+    local expr = self:parse_expression()
+    self:expect("delimiter", ")")
+    return expr
+end
+
+
 function parser:parse_primary()
     self:consume_newlines()
 
@@ -194,6 +202,10 @@ function parser:parse_primary()
             self:next_token()
             return ast.Identifier.new(token.value)
         end
+    elseif token.type == "comment" then
+        self:next_token() -- ignore comments
+    elseif token.type == "delimiter" and token.value == "(" then
+        return self:parse_grouping() 
     end
 end
 

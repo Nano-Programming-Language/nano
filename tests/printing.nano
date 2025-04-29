@@ -1,1 +1,14 @@
-print("Hello, world!")
+/* Printing in Nano can be done in 2 ways:
+*
+* 1. Using `println()` to print with a new line:
+*    This automatically moves the cursor to the next line after printing.
+*/
+
+println("Hey, look! A new line!")
+
+/*
+* 2. Using `print()` to print without a new line:
+*    This keeps the cursor on the same line after printing.
+*/
+
+print("Hello, Nano!")

@@ -90,6 +90,11 @@ function lexer:tokenize()
         elseif char == '"' then
             table.insert(tokens, self:read_string())
 
+        elseif char == "/" then
+            local comment = self:read_comments()
+            if comment then
+                table.insert(tokens, comment)
+            end
         else
             table.insert(tokens, self:read_operator_or_error())
         end
@@ -155,5 +160,37 @@ function lexer:read_operator_or_error()
             :format(first, self.line, self.column))
     end
 end
+
+function lexer:read_comments()
+    local next = self:peek(1)
+
+    if next == "/" then
+        self:next_char() 
+        self:next_char() 
+        local comment = ""
+        while not self:is_eof() and self:peek() ~= '\n' do
+            comment = comment .. self:next_char()
+        end
+        return { type = "comment", value = comment }
+
+    elseif next == "*" then
+        self:next_char() 
+        self:next_char() 
+        local comment = ""
+        while not self:is_eof() and not (self:peek() == "*" and self:peek(1) == "/") do
+            comment = comment .. self:next_char()
+        end
+        if self:is_eof() then
+            error(("Unterminated comment at line %d, column %d"):format(self.line, self.column))
+        end
+        self:next_char() 
+        self:next_char() 
+        return { type = "comment", value = comment }
+
+    else
+        return { type = "operator", value = "/" }
+    end
+end
+
 
 return lexer

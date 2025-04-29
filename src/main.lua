@@ -32,7 +32,6 @@ local function run_source(source)
 
     local bytecode = codegen.generate(ast)
     ast = nil
-
     if has_flag("--bc-keep") then
         local bytecode_file = "output.nbc"
         local file = io.open(bytecode_file, "wb")
@@ -45,7 +44,21 @@ local function run_source(source)
     end
 
     local _vm = vm.new(bytecode.bc)
-    _vm:set_debug(false)
+    if has_flag("--bc-debug") then
+        _vm:set_debug(true)
+    else
+        _vm:set_debug(false)
+    end
+    _vm:run()
+end
+
+local function run_bytecode(source)
+    local _vm = vm.new(source)
+    if has_flag("--bc-debug") then
+        _vm:set_debug(true)
+    else
+        _vm:set_debug(false)
+    end
     _vm:run()
 end
 
@@ -60,9 +73,7 @@ local function run_file(filepath)
     file:close()
 
     if filepath:sub(-4) == ".nbc" then
-        local _vm = vm.new(content)
-        _vm:set_debug(false)
-        _vm:run()
+        run_bytecode(content)
     else
         run_source(content)
     end
