@@ -97,79 +97,35 @@ function bytecode.generate(nodes)
 end
 
 function ast.Number:generate_bytecode(code_section, data_section)
-    table.insert(code_section, bytecode.OPCODES.PUSH)
-    table.insert(code_section, self.value)
+
 end
 
 function ast.String:generate_bytecode(code_section, data_section)
-    table.insert(data_section, self.value)
-    table.insert(code_section, bytecode.OPCODES.PUSH)
-    table.insert(code_section, "data[" .. #data_section .. "]")
+
 end
 
 function ast.Var:generate_bytecode(code_section, data_section)
-    self.value:generate_bytecode(code_section, data_section)
-    table.insert(code_section, bytecode.OPCODES.STV)
-    table.insert(code_section, self.name)
+
 end
 
 function ast.Identifier:generate_bytecode(code_section, data_section)
-    table.insert(code_section, bytecode.OPCODES.LDV)
-    table.insert(code_section, self.name)
+
 end
 
 function ast.Binary:generate_bytecode(code_section, data_section)
-    self.left:generate_bytecode(code_section, data_section)
-    self.right:generate_bytecode(code_section, data_section)
 
-    if self.op == "+" then
-        table.insert(code_section, bytecode.OPCODES.ADD)
-    elseif self.op == "-" then
-        table.insert(code_section, bytecode.OPCODES.SUB)
-    elseif self.op == "*" then
-        table.insert(code_section, bytecode.OPCODES.MUL)
-    elseif self.op == "/" then
-        table.insert(code_section, bytecode.OPCODES.DIV)
-    end
 end
 
 function ast.Call:generate_bytecode(code_section, data_section)
-    if self.callee == "println" then
-        self.args[1]:generate_bytecode(code_section, data_section)
-        table.insert(code_section, bytecode.OPCODES.PRINTLN)
-    elseif self.callee == "print" then 
-        self.args[1]:generate_bytecode(code_section, data_section)
-        table.insert(code_section, bytecode.OPCODES.PRINT)
-    elseif self.callee == "readln" then
-        table.insert(code_section, bytecode.OPCODES.READLN)
-    else
-        for _, arg in ipairs(self.args) do
-            arg:generate_bytecode(code_section, data_section)
-        end
-        table.insert(code_section, bytecode.OPCODES.CALL)
-        table.insert(code_section, self.callee)
-    end
+
 end
 
 function ast.Function:generate_bytecode(code_section, data_section)
-    table.insert(code_section, bytecode.OPCODES.FUNC)
-    table.insert(code_section, self.name)
 
-    for _, param in ipairs(self.params) do
-        table.insert(code_section, bytecode.OPCODES.STV)
-        table.insert(code_section, param)
-    end
-
-    for _, stmt in ipairs(self.body) do
-        stmt:generate_bytecode(code_section, data_section)
-    end
 end
 
 function ast.Return:generate_bytecode(code_section, data_section)
-    if self.value then
-        self.value:generate_bytecode(code_section, data_section)
-    end
-    table.insert(code_section, bytecode.OPCODES.RET)
+
 end
 
 return bytecode

@@ -12,6 +12,7 @@ local function define(kind, extra_methods)
         fields.kind = kind
         return setmetatable(fields, class)
     end
+    class.__call = class.new
 
     function class:print(indent)
         indent = indent or 0
