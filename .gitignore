@@ -1,3 +1,2 @@
-srlua/
-build.sh
-.vscode/
+lua/
+target/
