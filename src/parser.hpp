@@ -241,4 +241,19 @@ class Parser {
                         // TODO: error handling: Unexpected <token>
             }
       }
+
+  public:
+      std::vector<std::unique_ptr<ASTNode>> parse() {
+            std::vector<std::unique_ptr<ASTNode>> nodes;
+
+            while (peek_next().type != TypeOfToken::T_EOF) {
+                  auto node = std::unique_ptr<ASTNode>(parse_expr());
+                  nodes.push_back(std::move(node));
+
+                  if (peek_next().type == TypeOfToken::NEWLINE)
+                        next_token();
+            }
+
+            return nodes;
+      }
 };
