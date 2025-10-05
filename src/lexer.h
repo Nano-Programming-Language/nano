@@ -1,5 +1,4 @@
-module;
-
+#pragma once
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -11,15 +10,13 @@ module;
 // to think std::string doesn't exist
 #include <string>
 
-export module lexer;
-
-export constexpr std::array<std::string_view, 24> keywords = {
+constexpr std::array<std::string_view, 24> keywords = {
         "fn",       "return", "var",   "const",   "enum", "struct", "class", "dyn",
         "while",    "true",   "false", "for",     "if",   "elseif", "else",  "break",
         "continue", "switch", "case",  "default", "null", "import", "asm",   "comptime",
 };
 
-export enum class LexerError {
+enum class LexerError {
       unterminated_string,
       unterminated_character,
       unknown_character,
@@ -27,8 +24,8 @@ export enum class LexerError {
       unknown_escape_sequence,
 };
 
-// TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
-export enum class TypeOfToken {
+//TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
+enum class TypeOfToken {
       IDENTIFIER,
       KEYWORD,
       NUMBER,
@@ -72,17 +69,17 @@ export enum class TypeOfToken {
       T_EOF
 };
 
-export struct Token {
-      TypeOfToken type;
-      std::string_view val;
-      unsigned int line;
-      unsigned int column;
+struct Token {
+      const TypeOfToken type;
+      const std::string_view val;
+      const unsigned int line;
+      const unsigned int column;
 
-      explicit constexpr Token(TypeOfToken t = TypeOfToken::IDENTIFIER, std::string_view v = "", unsigned int l = 0,
-                               unsigned int c = 0) : type(t), val(v), line(l), column(c) {}
+      explicit constexpr Token(const TypeOfToken t = TypeOfToken::IDENTIFIER, const std::string_view v = "", const unsigned int l = 0,
+                               const unsigned int c = 0) : type(t), val(v), line(l), column(c) {}
 };
 
-export class Lexer {
+class Lexer {
       // to avoid a dangling pointer, std::string is used and we move it
       const std::string m_source;
       size_t m_index = 0;
