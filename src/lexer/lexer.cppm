@@ -1,14 +1,17 @@
-export module lexer;
+module;
+
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <string_view>
-#include <vector>
 #include <optional>
+#include <string_view>
 #include <utility>
+#include <vector>
 // for some weird reason, including string before a few other headers causes the clion lsp (and maybe the compiler)
 // to think std::string doesn't exist
 #include <string>
+
+export module lexer;
 
 export constexpr std::array<std::string_view, 24> keywords = {
         "fn",       "return", "var",   "const",   "enum", "struct", "class", "dyn",
@@ -24,7 +27,7 @@ export enum class LexerError {
       unknown_escape_sequence,
 };
 
-//TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
+// TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
 export enum class TypeOfToken {
       IDENTIFIER,
       KEYWORD,
