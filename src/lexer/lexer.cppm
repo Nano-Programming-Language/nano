@@ -1,10 +1,14 @@
+export module lexer;
+#include <algorithm>
 #include <array>
 #include <cctype>
-#include <string>
 #include <string_view>
 #include <vector>
-
-export module lexer;
+#include <optional>
+#include <utility>
+// for some weird reason, including string before a few other headers causes the clion lsp (and maybe the compiler)
+// to think std::string doesn't exist
+#include <string>
 
 export constexpr std::array<std::string_view, 24> keywords = {
         "fn",       "return", "var",   "const",   "enum", "struct", "class", "dyn",
@@ -12,6 +16,15 @@ export constexpr std::array<std::string_view, 24> keywords = {
         "continue", "switch", "case",  "default", "null", "import", "asm",   "comptime",
 };
 
+export enum class LexerError {
+      unterminated_string,
+      unterminated_character,
+      unknown_character,
+      unclosed_comment,
+      unknown_escape_sequence,
+};
+
+//TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
 export enum class TypeOfToken {
       IDENTIFIER,
       KEYWORD,
@@ -67,42 +80,44 @@ export struct Token {
 };
 
 export class Lexer {
-      std::string_view source;
-      size_t index = 0;
-      size_t line = 1;
-      size_t column = 1;
+      // to avoid a dangling pointer, std::string is used and we move it
+      const std::string m_source;
+      size_t m_index = 0;
+      size_t m_line = 1;
+      size_t m_column = 1;
 
   public:
-      explicit Lexer(std::string_view src) : source(src) {}
+      std::vector<Token> tokens;
+
+      explicit Lexer(std::string& src) : m_source(std::move(src)) {}
 
       char next_char() {
-            if (index >= source.size())
+            if (m_index >= m_source.size())
                   return '\0';
-            char c = source[index];
-            index++;
+            char c = m_source[m_index];
+            m_index++;
             if (c == '\n') {
-                  line++;
-                  column = 1;
+                  m_line++;
+                  m_column = 1;
             } else {
-                  column++;
+                  m_column++;
             }
             return c;
       }
 
       [[nodiscard]] char peek_next() const {
-            if (index >= source.size())
+            if (m_index >= m_source.size())
                   return '\0';
-            return source[index];
+            return m_source[m_index];
       }
 
-      std::vector<Token> tokenize() {
-            std::vector<Token> tokens;
-            while (index < source.size()) {
-                  char c = next_char();
+      std::optional<LexerError> tokenize() {
+            while (m_index < m_source.size()) {
+                  const char c = next_char();
                   if (std::isspace(c)) {
                         continue;
                   } else if (c == '\n') {
-                        tokens.emplace_back(TypeOfToken::NEWLINE, "[newline]", line, column);
+                        tokens.emplace_back(TypeOfToken::NEWLINE, "[newline]", m_line, m_column);
                   } else if (std::isalpha(c) || c == '_') {
                         std::string identifier;
                         identifier.push_back(c);
@@ -112,9 +127,9 @@ export class Lexer {
                         }
 
                         if (std::ranges::find(keywords, identifier) != keywords.end()) {
-                              tokens.emplace_back(TypeOfToken::KEYWORD, identifier, line, column);
+                              tokens.emplace_back(TypeOfToken::KEYWORD, identifier, m_line, m_column);
                         } else {
-                              tokens.emplace_back(TypeOfToken::IDENTIFIER, identifier, line, column);
+                              tokens.emplace_back(TypeOfToken::IDENTIFIER, identifier, m_line, m_column);
                         }
                   } else if (std::isdigit(c)) {
                         std::string num;
@@ -123,7 +138,7 @@ export class Lexer {
                         bool has_dot = false;
 
                         while (true) {
-                              char next = peek_next();
+                              const char next = peek_next();
 
                               if (std::isdigit(next)) {
                                     num.push_back(next);
@@ -137,7 +152,7 @@ export class Lexer {
                               }
                         }
 
-                        tokens.emplace_back(TypeOfToken::NUMBER, num, line, column);
+                        tokens.emplace_back(TypeOfToken::NUMBER, num, m_line, m_column);
                   } else if (c == '"') {
                         std::string str;
 
@@ -147,12 +162,12 @@ export class Lexer {
 
                         if (peek_next() == '"') {
                               next_char();
-                              tokens.emplace_back(TypeOfToken::STRING, str, line, column);
+                              tokens.emplace_back(TypeOfToken::STRING, str, m_line, m_column);
                         } else {
-                              // TODO: error handling: Unterminated string
+                              return LexerError::unterminated_string;
                         }
                   } else if (c == '/') {
-                        char next = peek_next();
+                        const char next = peek_next();
 
                         if (next == '/') {
                               next_char();
@@ -162,7 +177,7 @@ export class Lexer {
                                     comment.push_back(next_char());
                               }
 
-                              tokens.emplace_back(TypeOfToken::COMMENT, comment, line, column);
+                              tokens.emplace_back(TypeOfToken::COMMENT, comment, m_line, m_column);
                         } else if (next == '*') {
                               next_char();
                               std::string comment;
@@ -181,13 +196,13 @@ export class Lexer {
                                     comment.push_back(ch);
                               }
 
-                              tokens.emplace_back(TypeOfToken::COMMENT, comment, line, column);
+                              tokens.emplace_back(TypeOfToken::COMMENT, comment, m_line, m_column);
 
                               if (!closed) {
-                                    // TODO: error handling: Unclosed comment
+                                    return LexerError::unclosed_comment;
                               }
                         } else {
-                              tokens.emplace_back(TypeOfToken::OP_DIV, "/", line, column);
+                              tokens.emplace_back(TypeOfToken::OP_DIV, "/", m_line, m_column);
                         }
                   } else if (c == '\'') {
                         std::string str;
@@ -197,8 +212,7 @@ export class Lexer {
 
                         if (peek_next() == '\\') {
                               next_char();
-                              char esc = next_char();
-                              switch (esc) {
+                              switch (const char esc = next_char()) {
                                     case 'n':
                                           ch = '\n';
                                           break;
@@ -215,8 +229,7 @@ export class Lexer {
                                           ch = '"';
                                           break;
                                     default:
-                                          // TODO: error handling: Unknown escape sequence
-                                          break;
+                                          return LexerError::unknown_escape_sequence;
                               }
                         } else {
                               ch = next_char();
@@ -224,9 +237,9 @@ export class Lexer {
 
                         if (peek_next() == '\'') {
                               next_char();
-                              tokens.emplace_back(TypeOfToken::CHAR, std::string(1, ch), line, column);
+                              tokens.emplace_back(TypeOfToken::CHAR, std::string(1, ch), m_line, m_column);
                         } else {
-                              // TODO: error handling: Unterminated char
+                              return LexerError::unterminated_character;
                         }
                   } else {
                         TypeOfToken type;
@@ -360,13 +373,12 @@ export class Lexer {
                                     type = TypeOfToken::RBRACE;
                                     break;
                               default:
-                                    // TODO: error handling: Unknown character
-                                    continue;
+                                    return LexerError::unknown_character;
                         }
 
-                        tokens.emplace_back(type, op, line, column);
+                        tokens.emplace_back(type, op, m_line, m_column);
                   }
             }
-            return tokens;
+            return std::nullopt;
       }
 };
