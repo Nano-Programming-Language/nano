@@ -24,7 +24,7 @@ enum class LexerError {
       unknown_escape_sequence,
 };
 
-//TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
+// TODO: make all variants lower-cased, enum classes don't require them to be upper-cased.
 enum class TypeOfToken {
       IDENTIFIER,
       KEYWORD,
@@ -72,11 +72,11 @@ enum class TypeOfToken {
 struct Token {
       const TypeOfToken type;
       const std::string_view val;
-      const unsigned int line;
-      const unsigned int column;
+      const size_t line;
+      const size_t column;
 
-      explicit constexpr Token(const TypeOfToken t = TypeOfToken::IDENTIFIER, const std::string_view v = "", const unsigned int l = 0,
-                               const unsigned int c = 0) : type(t), val(v), line(l), column(c) {}
+      explicit constexpr Token(const TypeOfToken t = TypeOfToken::IDENTIFIER, const std::string_view v = "",
+                               const size_t l = 0, const size_t c = 0) : type(t), val(v), line(l), column(c) {}
 };
 
 class Lexer {
