@@ -7,11 +7,37 @@
 
 enum class Type { INT, FLOAT, STRING, BOOL, NULL_T, UNKNOWN };
 
+constexpr std::string_view type_to_str(Type t) {
+      switch (t) {
+            case Type::INT:
+                  return "int";
+            case Type::FLOAT:
+                  return "float";
+            case Type::STRING:
+                  return "string";
+            case Type::BOOL:
+                  return "bool";
+            case Type::NULL_T:
+                  return "null";
+            case Type::UNKNOWN:
+                  return "unknown_type";
+      }
+}
+
 class ASTNode {
   public:
       virtual ~ASTNode() = default;
-      [[nodiscard]] virtual std::string_view display() const = 0;
+      [[nodiscard]] constexpr virtual std::string_view display() const = 0;
       Type type = Type::UNKNOWN;
+};
+
+class NullNode : public ASTNode {
+  public:
+      Token token;
+
+      explicit NullNode(Token token) : token(std::move(token)) { type = Type::NULL_T; }
+
+      [[nodiscard]] constexpr std::string_view display() const override { return "null"; }
 };
 
 class NumberNode : public ASTNode {
@@ -20,11 +46,11 @@ class NumberNode : public ASTNode {
       bool isNeg;
       std::string_view val;
 
-      explicit NumberNode(Token tok, bool neg = false) : token(tok), isNeg(neg), val(tok.val) {
-            type = tok.val.find('.') == std::string_view::npos ? Type::INT : Type::FLOAT;
+      explicit NumberNode(Token& token, bool isNeg) : token(token), isNeg(isNeg), val(token.val) {
+            type = token.val.find('.') == std::string_view::npos ? Type::INT : Type::FLOAT;
       }
 
-      [[nodiscard]] std::string_view display() const override { return val; }
+      [[nodiscard]] constexpr std::string_view display() const override { return val; }
 };
 
 class BoolNode : public ASTNode {
@@ -32,9 +58,9 @@ class BoolNode : public ASTNode {
       Token token;
       bool val;
 
-      explicit BoolNode(Token tok, bool v) : token(std::move(tok)), val(v) { type = Type::BOOL; }
+      explicit BoolNode(Token& token, bool val) : token(std::move(token)), val(val) { type = Type::BOOL; }
 
-      [[nodiscard]] std::string_view display() const override { return val ? "true" : "false"; }
+      [[nodiscard]] constexpr std::string_view display() const override { return val ? "true" : "false"; }
 };
 
 class StringNode : public ASTNode {
@@ -42,9 +68,9 @@ class StringNode : public ASTNode {
       Token token;
       std::string_view val;
 
-      explicit StringNode(Token tok) : token(tok), val(tok.val) { type = Type::STRING; }
+      explicit StringNode(Token& token) : token(token), val(token.val) { type = Type::STRING; }
 
-      [[nodiscard]] std::string_view display() const override { return val; }
+      [[nodiscard]] constexpr std::string_view display() const override { return val; }
 };
 
 class BinaryOperation : public ASTNode {
@@ -57,14 +83,8 @@ class BinaryOperation : public ASTNode {
       mutable std::string buffer;
 
   public:
-      explicit BinaryOperation(std::unique_ptr<ASTNode> l, std::unique_ptr<ASTNode> r, Token o) :
-          left(std::move(l)), right(std::move(r)), op(std::move(o)) {
-            if (left->type == right->type) {
-                  type = left->type;
-            } else {
-                  // TODO: error handling: Type error
-            }
-      }
+      explicit BinaryOperation(std::unique_ptr<ASTNode> left, std::unique_ptr<ASTNode> right, Token op) :
+          left(std::move(left)), right(std::move(right)), op(std::move(op)) {}
 
       [[nodiscard]] std::string_view display() const override {
             buffer = "(" + std::string(left->display()) + " " + std::string(op.val) + " " +
@@ -86,7 +106,6 @@ class UnaryOperation : public ASTNode {
             if (node->type != Type::INT && node->type != Type::FLOAT) {
                   // TODO: error handling: Expected a number
             }
-            type = node->type;
       }
 
       [[nodiscard]] std::string_view display() const override {
@@ -97,19 +116,23 @@ class UnaryOperation : public ASTNode {
 
 class VariableNode : public ASTNode {
   public:
-      std::string_view name;
+      const std::string_view name;
       std::unique_ptr<ASTNode> val;
+      const Type type;
 
   private:
       mutable std::string buffer;
 
   public:
-      explicit VariableNode(std::string_view n, std::unique_ptr<ASTNode> v) : name(n), val(std::move(v)) {
-            type = val->type;
-      }
+      explicit VariableNode(const std::string_view n, std::unique_ptr<ASTNode> v = nullptr,
+                            const Type t = Type::UNKNOWN) : name(n), val(std::move(v)), type(t) {}
 
       [[nodiscard]] std::string_view display() const override {
-            buffer = std::string(name) + " = " + std::string(val->display());
+            if (val) {
+                  buffer = std::string(type_to_str(type)) + std::string(name) + " = " + std::string(val->display());
+            } else {
+                  buffer = std::string(type_to_str(type)) + std::string(name);
+            }
             return buffer;
       }
 };
@@ -122,10 +145,87 @@ class VariableCallNode : public ASTNode {
       mutable std::string buffer;
 
   public:
-      explicit VariableCallNode(std::string_view n) : name(n) {}
+      explicit VariableCallNode(const std::string_view n) : name(n) {}
+
+      [[nodiscard]] constexpr std::string_view display() const override {
+            buffer = std::string(name);
+            return buffer;
+      }
+};
+
+class PrototypeNode : public ASTNode {
+  public:
+      const std::string_view name;
+      std::vector<VariableNode> args;
+      const Type type;
+
+  private:
+      mutable std::string buffer;
+
+  public:
+      explicit PrototypeNode(const std::string_view name, std::vector<VariableNode>&& a, const Type t) :
+          name(name), args(std::move(a)), type(t) {}
 
       [[nodiscard]] std::string_view display() const override {
-            buffer = std::string(name);
+            buffer = std::string(type_to_str(type)) + " function " + std::string(name) + "(";
+            for (size_t i = 0; i < args.size(); i++) {
+                  buffer += args[i].display();
+                  if (i + 1 < args.size()) {
+                        buffer += ", ";
+                  }
+            }
+            buffer += ")";
+            return buffer;
+      }
+};
+
+class FunctionNode : public ASTNode {
+  public:
+      std::unique_ptr<PrototypeNode> Proto;
+      std::vector<std::unique_ptr<ASTNode>> Body;
+      Type type;
+
+  private:
+      mutable std::string buffer;
+
+  public:
+      explicit FunctionNode(std::unique_ptr<PrototypeNode> Proto, std::vector<std::unique_ptr<ASTNode>> Body) :
+          Proto(std::move(Proto)), Body(std::move(Body)) {
+            type = Proto->type;
+      };
+
+      [[nodiscard]] std::string_view display() const override {
+            buffer = std::string(Proto->display()) + " :\n";
+            for (size_t i = 0; i < Body.size(); i++) {
+                  buffer += "\t" + std::string(Body[i]->display());
+                  if (i + 1 < Body.size()) {
+                        buffer += "\n";
+                  }
+            }
+            return buffer;
+      }
+};
+
+class CallNode : public ASTNode {
+  public:
+      std::string_view callee;
+      std::vector<std::unique_ptr<ASTNode>> args;
+
+  private:
+      mutable std::string buffer;
+
+  public:
+      explicit CallNode(const std::string_view callee, std::vector<std::unique_ptr<ASTNode>> args) :
+          callee(callee), args(std::move(args)) {}
+
+      [[nodiscard]] std::string_view display() const override {
+            buffer = std::string(callee) + "(";
+            for (size_t i = 0; i < args.size(); i++) {
+                  buffer += std::string(args[i]->display());
+                  if (i + 1 < args.size()) {
+                        buffer += ", ";
+                  }
+            }
             return buffer;
       }
 };
@@ -134,13 +234,14 @@ class Scope {
   public:
       std::unordered_map<std::string_view, Type> variables;
 
-      void declare(std::string_view name, Type t) {
-            if (variables.contains(name))
+      void declare_var(std::string_view name, Type t) {
+            if (variables.contains(name)) {
                   // TODO: error handling: Already declared variable
-                  variables[name] = t;
+            }
+            variables[name] = t;
       }
 
-      Type get(std::string_view name) const {
+      Type get_var(std::string_view name) const {
             auto it = variables.find(name);
             if (it == variables.end()) {
                   // TODO: error handling: Undeclared variable
@@ -205,11 +306,11 @@ class Parser {
             Token token = next_token();
             switch (token.type) {
                   case TypeOfToken::NUMBER:
-                        return new NumberNode(token);
+                        return new NumberNode(token, false);
                   case TypeOfToken::STRING:
                         return new StringNode(token);
                   case TypeOfToken::IDENTIFIER: {
-                        Type t = current_scope.get(token.val);
+                        Type t = current_scope.get_var(token.val);
                         auto var = new VariableCallNode(token.val);
                         var->type = t;
                         return var;
@@ -232,8 +333,10 @@ class Parser {
                                     // TODO: error handling: Expected '='
                               }
                               auto val_node = std::unique_ptr<ASTNode>(parse_expr());
-                              current_scope.declare(name.val, val_node->type);
+                              current_scope.declare_var(name.val, val_node->type);
                               return new VariableNode(name.val, std::move(val_node));
+                        } else if (keyword == "null") {
+                              return new NullNode(token);
                         }
                         break;
                   }
