@@ -58,7 +58,7 @@ class BoolNode : public ASTNode {
       Token token;
       bool val;
 
-      explicit BoolNode(Token& token, bool val) : token(std::move(token)), val(val) { type = Type::BOOL; }
+      explicit BoolNode(Token& token, bool val) : token(token), val(val) { type = Type::BOOL; }
 
       [[nodiscard]] constexpr std::string_view display() const override { return val ? "true" : "false"; }
 };
@@ -68,7 +68,7 @@ class StringNode : public ASTNode {
       Token token;
       std::string_view val;
 
-      explicit StringNode(Token& token) : token(token), val(token.val) { type = Type::STRING; }
+      explicit StringNode(const Token& token) : token(token), val(token.val) { type = Type::STRING; }
 
       [[nodiscard]] constexpr std::string_view display() const override { return val; }
 };
@@ -230,23 +230,64 @@ class CallNode : public ASTNode {
       }
 };
 
+struct Symbol {
+      Type type;
+      std::unique_ptr<ASTNode> val;
+      bool is_const;
+      std::string_view name;
+
+      explicit Symbol(const Type& type = Type::UNKNOWN, std::unique_ptr<ASTNode> val = nullptr, bool is_const = false,
+                      std::string_view name = "") : type(type), val(std::move(val)), is_const(is_const), name(name) {}
+};
+
 class Scope {
   public:
-      std::unordered_map<std::string_view, Type> variables;
+      struct Symbols {
+            std::unordered_map<std::string_view, Symbol> vars;
+            std::unordered_map<std::string_view, Symbol> functions;
+      };
 
-      void declare_var(std::string_view name, Type t) {
-            if (variables.contains(name)) {
+      Symbols symbols;
+      Scope* parent;
+
+      explicit Scope(Scope* parent = nullptr) : parent(parent) {}
+
+      void declare_var(std::string_view name, Symbol sym) {
+            if (symbols.vars.contains(name)) {
                   // TODO: error handling: Already declared variable
+                  return;
             }
-            variables[name] = t;
+            symbols.vars[name] = std::move(sym);
       }
 
-      Type get_var(std::string_view name) const {
-            auto it = variables.find(name);
-            if (it == variables.end()) {
-                  // TODO: error handling: Undeclared variable
+      Symbol* get_var(std::string_view name) {
+            if (auto it = symbols.vars.find(name); it != symbols.vars.end())
+                  return &it->second;
+
+            if (parent)
+                  return parent->get_var(name);
+
+            // TODO: error handling: Unknown variable
+            return nullptr;
+      }
+
+      void declare_function(std::string_view name, Symbol sym) {
+            if (symbols.functions.contains(name)) {
+                  // TODO: error handling: Already defined function
+                  return;
             }
-            return it->second;
+            symbols.functions[name] = std::move(sym);
+      }
+
+      Symbol* get_function(std::string_view name) {
+            if (auto it = symbols.functions.find(name); it != symbols.functions.end())
+                  return &it->second;
+
+            if (parent)
+                  return parent->get_function(name);
+
+            // TODO: error handling: Unknown function
+            return nullptr;
       }
 };
 
@@ -256,7 +297,8 @@ class Parser {
       size_t index;
       size_t column;
       size_t line;
-      Scope current_scope;
+      Scope* global_scope = new Scope();
+      Scope* current_scope = global_scope;
 
       explicit Parser(std::vector<Token> tokns) : tokens(std::move(tokns)), index(0), column(1), line(1) {}
 
@@ -310,9 +352,9 @@ class Parser {
                   case TypeOfToken::STRING:
                         return new StringNode(token);
                   case TypeOfToken::IDENTIFIER: {
-                        Type t = current_scope.get_var(token.val);
+                        Symbol* sym = current_scope->get_var(token.val);
                         auto var = new VariableCallNode(token.val);
-                        var->type = t;
+                        var->type = sym->type;
                         return var;
                   }
                   case TypeOfToken::OP_MINUS:
@@ -333,13 +375,115 @@ class Parser {
                                     // TODO: error handling: Expected '='
                               }
                               auto val_node = std::unique_ptr<ASTNode>(parse_expr());
-                              current_scope.declare_var(name.val, val_node->type);
+                              Symbol sym(val_node->type, std::move(val_node));
+                              current_scope->declare_var(name.val, std::move(sym));
                               return new VariableNode(name.val, std::move(val_node));
                         } else if (keyword == "null") {
                               return new NullNode(token);
+                        } else if (keyword == "fn") {
+                              Token name = next_token();
+                              if (name.type != TypeOfToken::IDENTIFIER) {
+                                    // TODO: error handling: Expected function name
+                              }
+
+                              Token lparen = next_token();
+                              if (lparen.type != TypeOfToken::LPAREN) {
+                                    // TODO: error handling: Expected '(' after function name
+                              }
+
+                              std::vector<VariableNode> params;
+
+                              while (peek_next().type != TypeOfToken::RPAREN &&
+                                     peek_next().type != TypeOfToken::T_EOF) {
+                                    Token param_name = next_token();
+                                    if (param_name.type != TypeOfToken::IDENTIFIER) {
+                                          // TODO: error handling: Expected parameter name
+                                    }
+
+                                    Token colon = next_token();
+                                    if (colon.type != TypeOfToken::COLON) {
+                                          // TODO: error handling: Expected colon
+                                    }
+
+                                    Token type_token = next_token();
+                                    if (type_token.type != TypeOfToken::IDENTIFIER) {
+                                          // TODO: error handling: Expected parameter type
+                                    }
+
+                                    Type param_type;
+                                    if (type_token.val == "int")
+                                          param_type = Type::INT;
+                                    else if (type_token.val == "float")
+                                          param_type = Type::FLOAT;
+                                    else if (type_token.val == "bool")
+                                          param_type = Type::BOOL;
+                                    else if (type_token.val == "string")
+                                          param_type = Type::STRING;
+                                    else if (type_token.val == "null")
+                                          param_type = Type::NULL_T;
+                                    else
+                                          param_type = Type::UNKNOWN;
+
+                                    params.emplace_back(param_name.val, nullptr, param_type);
+
+                                    if (peek_next().type == TypeOfToken::COMMA)
+                                          next_token();
+                              }
+
+                              Token rparen = next_token();
+                              if (rparen.type != TypeOfToken::RPAREN) {
+                                    // TODO: error handling: Expected ')'
+                              }
+
+                              Token colon = next_token();
+                              if (colon.type != TypeOfToken::COLON) {
+                                    // TODO: error handling: Expected colon
+                              }
+
+                              Token ret_type_token = next_token();
+                              if (ret_type_token.type != TypeOfToken::IDENTIFIER) {
+                                    // TODO: error handling: Expected function return type
+                              }
+
+                              Type ret_type;
+                              if (ret_type_token.val == "int")
+                                    ret_type = Type::INT;
+                              else if (ret_type_token.val == "float")
+                                    ret_type = Type::FLOAT;
+                              else if (ret_type_token.val == "bool")
+                                    ret_type = Type::BOOL;
+                              else if (ret_type_token.val == "string")
+                                    ret_type = Type::STRING;
+                              else if (ret_type_token.val == "null")
+                                    ret_type = Type::NULL_T;
+                              else
+                                    ret_type = Type::UNKNOWN;
+
+                              auto proto = std::make_unique<PrototypeNode>(name.val, std::move(params), ret_type);
+
+                              if (peek_next().type == TypeOfToken::SEMICOLON) {
+                                    next_token();
+                                    Symbol sym(ret_type, nullptr);
+                                    current_scope->declare_function(name.val, std::move(sym));
+                                    return proto.release();
+                              } else if (peek_next().type == TypeOfToken::LBRACE) {
+                                    next_token();
+                                    Symbol sym(ret_type, nullptr);
+                                    current_scope->declare_var(name.val, std::move(sym));
+                                    current_scope = new Scope(current_scope);
+                                    while (peek_next().type != TypeOfToken::RBRACE ||
+                                           peek_next().type != TypeOfToken::T_EOF) {
+                                          // ...
+                                    }
+                                    // ...
+                                    current_scope = current_scope->parent;
+                                    return nullptr; // placeholder
+                              }
                         }
                         break;
                   }
+                  case TypeOfToken::COMMENT:
+                        next_token();
                   default:
                         // TODO: error handling: Unexpected <token>
             }
