@@ -80,7 +80,6 @@ struct Token {
 };
 
 class Lexer {
-      // to avoid a dangling pointer, std::string is used and we move it
       const std::string m_source;
       size_t m_index = 0;
       size_t m_line = 1;
@@ -89,13 +88,12 @@ class Lexer {
   public:
       std::vector<Token> tokens;
 
-      explicit Lexer(std::string& src) : m_source(std::move(src)) {}
+      explicit Lexer(std::string src) : m_source(std::move(src)) {}
 
-      char next_char() {
+      constexpr char next_char() {
             if (m_index >= m_source.size())
                   return '\0';
-            char c = m_source[m_index];
-            m_index++;
+            char c = m_source[m_index++];
             if (c == '\n') {
                   m_line++;
                   m_column = 1;
@@ -105,7 +103,7 @@ class Lexer {
             return c;
       }
 
-      [[nodiscard]] char peek_next() const {
+      [[nodiscard]] constexpr char peek_next() const {
             if (m_index >= m_source.size())
                   return '\0';
             return m_source[m_index];
@@ -113,40 +111,43 @@ class Lexer {
 
       std::optional<LexerError> tokenize() {
             while (m_index < m_source.size()) {
-                  const char c = next_char();
-                  if (std::isspace(c)) {
+                  const char c = peek_next();
+                  if (std::isspace(static_cast<unsigned char>(c))) {
+                        next_char();
                         continue;
-                  } else if (c == '\n') {
+                  }
+                  if (c == '\n') {
+                        next_char();
                         tokens.emplace_back(TypeOfToken::NEWLINE, "[newline]", m_line, m_column);
-                  } else if (std::isalpha(c) || c == '_') {
-                        std::string identifier;
-                        identifier.push_back(c);
+                        continue;
+                  }
 
-                        while (std::isalnum(peek_next()) || peek_next() == '_') {
+                  next_char();
+
+                  if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
+                        std::string identifier(1, c);
+
+                        while (std::isalnum(static_cast<unsigned char>(peek_next())) || peek_next() == '_') {
                               identifier.push_back(next_char());
                         }
 
-                        if (std::ranges::find(keywords, identifier) != keywords.end()) {
+                        if (std::ranges::find(keywords, std::string_view(identifier)) != keywords.end()) {
                               tokens.emplace_back(TypeOfToken::KEYWORD, identifier, m_line, m_column);
                         } else {
                               tokens.emplace_back(TypeOfToken::IDENTIFIER, identifier, m_line, m_column);
                         }
-                  } else if (std::isdigit(c)) {
-                        std::string num;
-                        num.push_back(c);
-
+                  } else if (std::isdigit(static_cast<unsigned char>(c))) {
+                        std::string num(1, c);
                         bool has_dot = false;
 
                         while (true) {
                               const char next = peek_next();
 
-                              if (std::isdigit(next)) {
-                                    num.push_back(next);
-                                    next_char();
+                              if (std::isdigit(static_cast<unsigned char>(next))) {
+                                    num.push_back(next_char());
                               } else if (next == '.' && !has_dot) {
                                     has_dot = true;
-                                    num.push_back(next);
-                                    next_char();
+                                    num.push_back(next_char());
                               } else {
                                     break;
                               }
@@ -185,9 +186,8 @@ class Lexer {
 
                               while (true) {
                                     char ch = next_char();
-                                    if (ch == '\0') {
+                                    if (ch == '\0')
                                           break;
-                                    }
                                     if (ch == '*' && peek_next() == '/') {
                                           next_char();
                                           closed = true;
@@ -205,11 +205,7 @@ class Lexer {
                               tokens.emplace_back(TypeOfToken::OP_DIV, "/", m_line, m_column);
                         }
                   } else if (c == '\'') {
-                        std::string str;
-
-                        char ch = '\0';
-                        next_char();
-
+                        char ch;
                         if (peek_next() == '\\') {
                               next_char();
                               switch (const char esc = next_char()) {
@@ -244,7 +240,7 @@ class Lexer {
                   } else {
                         TypeOfToken type;
                         std::string op(1, c);
-                        char next = peek_next();
+                        const char next = peek_next();
 
                         switch (c) {
                               case '+':
@@ -379,6 +375,8 @@ class Lexer {
                         tokens.emplace_back(type, op, m_line, m_column);
                   }
             }
+
+            tokens.emplace_back(TypeOfToken::T_EOF, "[eof]", m_line, m_column);
             return std::nullopt;
       }
 };

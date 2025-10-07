@@ -468,16 +468,17 @@ class Parser {
                                     return proto.release();
                               } else if (peek_next().type == TypeOfToken::LBRACE) {
                                     next_token();
+                                    std::vector<std::unique_ptr<ASTNode>> body;
                                     Symbol sym(ret_type, nullptr);
-                                    current_scope->declare_var(name.val, std::move(sym));
+                                    current_scope->declare_function(name.val, std::move(sym));
                                     current_scope = new Scope(current_scope);
-                                    while (peek_next().type != TypeOfToken::RBRACE ||
+                                    while (peek_next().type != TypeOfToken::RBRACE &&
                                            peek_next().type != TypeOfToken::T_EOF) {
-                                          // ...
+                                          body.emplace_back(std::unique_ptr<ASTNode>(parse_expr()));
                                     }
-                                    // ...
+                                    Token rbrace = next_token();
                                     current_scope = current_scope->parent;
-                                    return nullptr; // placeholder
+                                    return new FunctionNode(std::move(proto), std::move(body));
                               }
                         }
                         break;
